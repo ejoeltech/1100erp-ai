@@ -45,7 +45,7 @@ define('COMPANY_WEBSITE', getSetting('company_website', ''));
 define('VAT_RATE', (float) getSetting('vat_rate', 7.5));
 define('CURRENCY_SYMBOL', getSetting('currency_symbol', '₦'));
 define('DEFAULT_PAYMENT_TERMS', getSetting('default_payment_terms', '80% Initial Deposit'));
-define('TINYMCE_API_KEY', getSetting('tinymce_api_key', 'no-api-key'));
+
 define('THEME_COLOR', getSetting('theme_color', '#2563eb'));
 
 // Bank account helper functions
