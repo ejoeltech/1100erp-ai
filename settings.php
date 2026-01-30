@@ -886,15 +886,8 @@ include '../includes/header.php';
                     <h5 class="font-semibold text-gray-800 mb-2">Restoration</h5>
                     <p class="text-sm text-gray-600 mb-4">Upload a SQL file to restore your database. <strong>Warning:
                             This overwrites all data.</strong></p>
-                    <div class="mb-3 mt-2">
-                        <label class="flex items-center space-x-2">
-                            <input type="checkbox" id="restoreMedia" checked
-                                class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
-                            <span class="text-sm text-gray-700">Include Media Files (from ZIP)</span>
-                        </label>
-                    </div>
                     <div class="flex gap-2">
-                        <input type="file" id="restoreFile" accept=".sql,.zip" class="block w-full text-sm text-gray-500
+                        <input type="file" id="restoreFile" accept=".sql" class="block w-full text-sm text-gray-500
                                 file:mr-4 file:py-2 file:px-4
                                 file:rounded-full file:border-0
                                 file:text-sm file:font-semibold
@@ -923,12 +916,7 @@ include '../includes/header.php';
             <div class="mb-6">
                 <h5 class="font-semibold text-gray-800 mb-2">Apply Update Patch</h5>
                 <p class="text-sm text-gray-600 mb-4">Upload a valid <code>.zip</code> update package provided by the
-                    developer.
-                    <span class="block mt-1 text-xs text-blue-600">
-                        Server Max Upload Size: <?php echo ini_get('upload_max_filesize'); ?>
-                        (Post Max: <?php echo ini_get('post_max_size'); ?>)
-                    </span>
-                </p>
+                    developer.</p>
                 <div class="flex gap-2 items-center">
                     <input type="file" id="patchFile" accept=".zip" class="block w-full text-sm text-gray-500
                             file:mr-4 file:py-2 file:px-4
@@ -959,87 +947,10 @@ include '../includes/header.php';
                 <h5 class="font-semibold text-gray-800 mb-2">Create Update Package</h5>
                 <p class="text-sm text-gray-600 mb-4">Generates a deployable <code>.zip</code> of the current system
                     (excludes local config/uploads).</p>
-
-                <div class="flex flex-col gap-4">
-                    <div class="flex items-center gap-2">
-                        <label class="text-sm font-semibold text-gray-700">Changes in last:</label>
-                        <div class="flex items-center gap-1">
-                            <input type="number" id="patchHours" value="0" min="0" onchange="updatePatchLink()"
-                                class="w-16 px-2 py-1 border border-gray-300 rounded text-sm text-center">
-                            <span class="text-xs text-gray-600">hrs</span>
-                        </div>
-                        <div class="flex items-center gap-1">
-                            <input type="number" id="patchMinutes" value="10" min="0" onchange="updatePatchLink()"
-                                class="w-16 px-2 py-1 border border-gray-300 rounded text-sm text-center">
-                            <span class="text-xs text-gray-600">mins</span>
-                        </div>
-                    </div>
-
-                    <div class="flex flex-wrap gap-4 p-3 bg-gray-50 rounded border border-gray-200">
-                        <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-                            <input type="checkbox" id="excludeVendor" onchange="updatePatchLink()"
-                                class="rounded text-green-600 focus:ring-green-500">
-                            Exclude Vendor (mpdf/libs)
-                        </label>
-                        <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-                            <input type="checkbox" id="excludeSetup" onchange="updatePatchLink()"
-                                class="rounded text-green-600 focus:ring-green-500">
-                            Exclude Setup Folder
-                        </label>
-                        <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-                            <input type="checkbox" id="excludeDatabase" onchange="updatePatchLink()"
-                                class="rounded text-green-600 focus:ring-green-500">
-                            Exclude Database Scripts
-                        </label>
-                    </div>
-
-                    <div class="flex gap-2">
-                        <a href="../api/system/create-patch.php?hours=0&minutes=10" id="patchBtn"
-                            class="inline-flex items-center px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-800 font-semibold shadow-sm text-sm whitespace-nowrap">
-                            Generate Patch ZIP
-                        </a>
-                        <button type="button" onclick="setFullPatch()"
-                            class="px-3 py-2 text-xs text-blue-600 hover:text-blue-800 font-semibold border border-blue-200 rounded hover:bg-blue-50">
-                            Reset to Full System
-                        </button>
-                    </div>
-                </div>
-
-                <script>
-                    function updatePatchLink() {
-                        const h = document.getElementById('patchHours').value || 0;
-                        const m = document.getElementById('patchMinutes').value || 0;
-
-                        const excludeVendor = document.getElementById('excludeVendor').checked ? 1 : 0;
-                        const excludeSetup = document.getElementById('excludeSetup').checked ? 1 : 0;
-                        const excludeDatabase = document.getElementById('excludeDatabase').checked ? 1 : 0;
-
-                        let url = `../api/system/create-patch.php?hours=${h}&minutes=${m}`;
-                        if (excludeVendor) url += '&exclude_vendor=1';
-                        if (excludeSetup) url += '&exclude_setup=1';
-                        if (excludeDatabase) url += '&exclude_database=1';
-
-                        document.getElementById('patchBtn').href = url;
-                        document.getElementById('patchBtn').innerHTML = `Generate Patch (${h}h ${m}m)`;
-                    }
-
-                    function setFullPatch() {
-                        document.getElementById('patchHours').value = '';
-                        document.getElementById('patchMinutes').value = '';
-                        document.getElementById('excludeVendor').checked = false;
-                        document.getElementById('excludeSetup').checked = false;
-                        document.getElementById('excludeDatabase').checked = false;
-                        document.getElementById('patchBtn').href = '../api/system/create-patch.php?timeframe=full';
-                        document.getElementById('patchBtn').innerHTML = 'Generate Full Patch';
-                    }
-                </script>
-
-                <script>
-                    function updatePatchLink() {
-                        const timeframe = document.getElementById('patchTimeframe').value;
-                        document.getElementById('patchBtn').href = '../api/system/create-patch.php?timeframe=' + timeframe;
-                    }
-                </script>
+                <a href="../api/system/create-patch.php"
+                    class="inline-flex items-center px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-800 font-semibold shadow-sm text-sm">
+                    Generate Patch ZIP
+                </a>
             </div>
         </div>
 
@@ -1058,7 +969,6 @@ include '../includes/header.php';
 
             const formData = new FormData();
             formData.append('file', fileInput.files[0]);
-            formData.append('include_media', document.getElementById('restoreMedia').checked ? '1' : '0');
 
             const btn = event.target;
             const originalText = btn.innerHTML;
