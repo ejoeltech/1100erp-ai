@@ -1,552 +1,816 @@
--- 1100-ERP Complete Database Schema
--- Auto-Installation Schema for Setup Wizard
--- Version: 2.0.0
--- Generated: 2026-01-16
+-- 1100-ERP Installation Schema
+-- Generated: 2026-02-15 22:35:53
+-- 
 
--- Note: This schema is used by the setup wizard
--- Do not include CREATE DATABASE or USE statements
--- The wizard handles database selection
+SET FOREIGN_KEY_CHECKS=0;
 
--- ============================================
--- DROP EXISTING TABLES (in reverse dependency order)
--- ============================================
+-- Table structure for `ai_recommendations`
+DROP TABLE IF EXISTS `ai_recommendations`;
+CREATE TABLE `ai_recommendations` (
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `user_id` int(10) unsigned DEFAULT NULL,
+  `customer_name` varchar(255) DEFAULT NULL,
+  `customer_description` text NOT NULL,
+  `appliances_json` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`appliances_json`)),
+  `power_analysis` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`power_analysis`)),
+  `recommended_system` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL CHECK (json_valid(`recommended_system`)),
+  `roi_analysis` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL CHECK (json_valid(`roi_analysis`)),
+  `quote_id` int(10) unsigned DEFAULT NULL,
+  `created_quote` tinyint(1) DEFAULT 0,
+  `model_used` varchar(50) DEFAULT 'groq-llama-3.1-70b',
+  `processing_time_ms` int(11) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `quote_id` (`quote_id`),
+  KEY `idx_user_id` (`user_id`),
+  KEY `idx_created_at` (`created_at`),
+  KEY `idx_customer_name` (`customer_name`),
+  CONSTRAINT `ai_recommendations_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `ai_recommendations_ibfk_2` FOREIGN KEY (`quote_id`) REFERENCES `quotes` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- Drop child tables first (those with foreign keys)
-DROP TABLE IF EXISTS audit_log;
-DROP TABLE IF EXISTS readymade_quote_template_items;
-DROP TABLE IF EXISTS readymade_quote_templates;
-DROP TABLE IF EXISTS readymade_quote_categories;
-DROP TABLE IF EXISTS receipts;
-DROP TABLE IF EXISTS invoice_line_items;
-DROP TABLE IF EXISTS invoices;
-DROP TABLE IF EXISTS quote_line_items;
-DROP TABLE IF EXISTS quotes;
+-- Table structure for `ai_request_cache`
+DROP TABLE IF EXISTS `ai_request_cache`;
+CREATE TABLE `ai_request_cache` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `request_hash` varchar(64) NOT NULL,
+  `tool_name` varchar(50) NOT NULL,
+  `request_params` text NOT NULL,
+  `response_data` mediumtext NOT NULL,
+  `hit_count` int(11) DEFAULT 1,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `last_accessed` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `expires_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `request_hash` (`request_hash`),
+  KEY `idx_hash` (`request_hash`),
+  KEY `idx_tool` (`tool_name`),
+  KEY `idx_expires` (`expires_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- Drop parent tables
-DROP TABLE IF EXISTS customers;
-DROP TABLE IF EXISTS products;
-DROP TABLE IF EXISTS users;
-DROP TABLE IF EXISTS bank_accounts;
-DROP TABLE IF EXISTS settings;
+-- Table structure for `ai_usage_logs`
+DROP TABLE IF EXISTS `ai_usage_logs`;
+CREATE TABLE `ai_usage_logs` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `user_id` int(10) unsigned DEFAULT NULL,
+  `ip_address` varchar(45) NOT NULL,
+  `tool_name` varchar(50) NOT NULL,
+  `endpoint` varchar(100) NOT NULL,
+  `request_hash` varchar(64) DEFAULT NULL,
+  `tokens_used` int(11) DEFAULT 0,
+  `cost_usd` decimal(10,4) DEFAULT 0.0000,
+  `processing_time` float DEFAULT NULL,
+  `success` tinyint(1) DEFAULT 1,
+  `error_message` text DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `idx_user_date` (`user_id`,`created_at`),
+  KEY `idx_ip_date` (`ip_address`,`created_at`),
+  KEY `idx_tool_date` (`tool_name`,`created_at`),
+  KEY `idx_date` (`created_at`),
+  KEY `idx_hash` (`request_hash`),
+  CONSTRAINT `ai_usage_logs_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- ============================================
--- CORE TABLES
--- ============================================
-
--- Users table
-
-CREATE TABLE users (
-    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    username VARCHAR(50) UNIQUE NOT NULL,
-    password VARCHAR(255) NOT NULL,
-    full_name VARCHAR(255) NOT NULL,
-    email VARCHAR(255) UNIQUE NOT NULL,
-    phone VARCHAR(20) DEFAULT NULL,
-    role ENUM('admin', 'manager', 'sales', 'viewer') DEFAULT 'sales',
-    is_active TINYINT(1) DEFAULT 1,
-    signature_file VARCHAR(255) DEFAULT NULL,
-    last_login TIMESTAMP NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    INDEX idx_username (username),
-    INDEX idx_email (email),
-    INDEX idx_role (role)
+-- Table structure for `audit_log`
+DROP TABLE IF EXISTS `audit_log`;
+CREATE TABLE `audit_log` (
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `user_id` int(10) unsigned DEFAULT NULL,
+  `action` varchar(50) NOT NULL,
+  `resource_type` varchar(50) DEFAULT NULL,
+  `resource_id` int(10) unsigned DEFAULT NULL,
+  `ip_address` varchar(45) DEFAULT NULL,
+  `user_agent` text DEFAULT NULL,
+  `details` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`details`)),
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `idx_user_id` (`user_id`),
+  KEY `idx_action` (`action`),
+  KEY `idx_resource` (`resource_type`,`resource_id`),
+  KEY `idx_created_at` (`created_at`),
+  KEY `idx_details` (`details`(100)),
+  CONSTRAINT `audit_log_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Products table
-CREATE TABLE IF NOT EXISTS products (
-    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    product_code VARCHAR(50) UNIQUE NOT NULL,
-    product_name VARCHAR(255) NOT NULL,
-    category VARCHAR(100) DEFAULT 'General',
-    description TEXT,
-    unit_price DECIMAL(15,2) NOT NULL DEFAULT 0.00,
-    vat_applicable TINYINT(1) DEFAULT 1,
-    is_active TINYINT(1) DEFAULT 1,
-    created_by INT UNSIGNED DEFAULT NULL,
-    deleted_at TIMESTAMP NULL DEFAULT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    INDEX idx_product_code (product_code),
-    INDEX idx_product_name (product_name),
-    INDEX idx_category (category),
-    INDEX idx_is_active (is_active)
+-- Table structure for `bank_accounts`
+DROP TABLE IF EXISTS `bank_accounts`;
+CREATE TABLE `bank_accounts` (
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `bank_name` varchar(255) NOT NULL,
+  `account_number` varchar(50) NOT NULL,
+  `account_name` varchar(255) NOT NULL,
+  `is_active` tinyint(1) DEFAULT 1,
+  `show_on_documents` tinyint(1) DEFAULT 0,
+  `display_order` int(11) DEFAULT 0,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `idx_bank_name` (`bank_name`),
+  KEY `idx_is_active` (`is_active`),
+  KEY `idx_display_order` (`display_order`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Customers table
-CREATE TABLE IF NOT EXISTS customers (
-    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    customer_name VARCHAR(255) NOT NULL,
-    email VARCHAR(255),
-    phone VARCHAR(50),
-    address TEXT,
-    city VARCHAR(100),
-    state VARCHAR(100),
-    country VARCHAR(100),
-    is_active TINYINT(1) DEFAULT 1,
-    company VARCHAR(255) DEFAULT NULL,
-    notes TEXT DEFAULT NULL,
-    account_balance DECIMAL(15,2) DEFAULT 0.00,
-    deleted_at TIMESTAMP NULL DEFAULT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    INDEX idx_customer_name (customer_name),
-    INDEX idx_email (email),
-    INDEX idx_is_active (is_active)
+-- Table structure for `customers`
+DROP TABLE IF EXISTS `customers`;
+CREATE TABLE `customers` (
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `customer_name` varchar(255) NOT NULL,
+  `email` varchar(255) DEFAULT NULL,
+  `phone` varchar(50) DEFAULT NULL,
+  `address` text DEFAULT NULL,
+  `city` varchar(100) DEFAULT NULL,
+  `state` varchar(100) DEFAULT NULL,
+  `country` varchar(100) DEFAULT NULL,
+  `is_active` tinyint(1) DEFAULT 1,
+  `company` varchar(255) DEFAULT NULL,
+  `notes` text DEFAULT NULL,
+  `account_balance` decimal(15,2) DEFAULT 0.00,
+  `deleted_at` timestamp NULL DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `idx_customer_name` (`customer_name`),
+  KEY `idx_email` (`email`),
+  KEY `idx_is_active` (`is_active`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ============================================
--- DOCUMENT TABLES
--- ============================================
+-- Table structure for `hr_attendance`
+DROP TABLE IF EXISTS `hr_attendance`;
+CREATE TABLE `hr_attendance` (
+  `id` int(11) unsigned NOT NULL AUTO_INCREMENT,
+  `employee_id` int(11) unsigned NOT NULL,
+  `date` date NOT NULL,
+  `clock_in` time DEFAULT NULL,
+  `clock_out` time DEFAULT NULL,
+  `status` enum('present','absent','late','half_day','on_leave') DEFAULT 'present',
+  `notes` text DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `idx_date` (`date`),
+  KEY `employee_id` (`employee_id`),
+  CONSTRAINT `hr_attendance_ibfk_1` FOREIGN KEY (`employee_id`) REFERENCES `hr_employees` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- Quotes table
-CREATE TABLE IF NOT EXISTS quotes (
-    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    quote_number VARCHAR(50) UNIQUE NOT NULL,
-    quote_title VARCHAR(255) NOT NULL,
-    customer_id INT UNSIGNED,
-    customer_name VARCHAR(255) NOT NULL,
-    salesperson VARCHAR(255) NOT NULL,
-    quote_date DATE NOT NULL,
-    subtotal DECIMAL(15,2) NOT NULL DEFAULT 0.00,
-    total_vat DECIMAL(15,2) NOT NULL DEFAULT 0.00,
-    grand_total DECIMAL(15,2) NOT NULL DEFAULT 0.00,
-    payment_terms VARCHAR(255) DEFAULT '80% Initial Deposit',
-    delivery_period VARCHAR(255) DEFAULT NULL,
-    status ENUM('draft', 'finalized', 'approved', 'rejected', 'expired') DEFAULT 'draft',
-    notes TEXT,
-    created_by INT UNSIGNED,
-    is_archived TINYINT(1) DEFAULT 0,
-    deleted_at TIMESTAMP NULL DEFAULT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL,
-    FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE SET NULL,
-    INDEX idx_quote_number (quote_number),
-    INDEX idx_customer_name (customer_name),
-    INDEX idx_status (status),
-    INDEX idx_created_at (created_at)
+-- Table structure for `hr_departments`
+DROP TABLE IF EXISTS `hr_departments`;
+CREATE TABLE `hr_departments` (
+  `id` int(11) unsigned NOT NULL AUTO_INCREMENT,
+  `name` varchar(255) NOT NULL,
+  `description` text DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- Table structure for `hr_designations`
+DROP TABLE IF EXISTS `hr_designations`;
+CREATE TABLE `hr_designations` (
+  `id` int(11) unsigned NOT NULL AUTO_INCREMENT,
+  `department_id` int(11) unsigned DEFAULT NULL,
+  `title` varchar(255) NOT NULL,
+  `description` text DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `department_id` (`department_id`),
+  CONSTRAINT `hr_designations_ibfk_1` FOREIGN KEY (`department_id`) REFERENCES `hr_departments` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- Table structure for `hr_documents`
+DROP TABLE IF EXISTS `hr_documents`;
+CREATE TABLE `hr_documents` (
+  `id` int(11) unsigned NOT NULL AUTO_INCREMENT,
+  `title` varchar(255) NOT NULL,
+  `type` enum('offer_letter','termination_letter','query','recommendation','contract','other') NOT NULL,
+  `related_employee_id` int(11) unsigned DEFAULT NULL,
+  `related_candidate_id` int(11) unsigned DEFAULT NULL,
+  `content` mediumtext DEFAULT NULL,
+  `generated_by` int(10) unsigned DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `related_employee_id` (`related_employee_id`),
+  KEY `related_candidate_id` (`related_candidate_id`),
+  KEY `generated_by` (`generated_by`),
+  CONSTRAINT `hr_documents_ibfk_1` FOREIGN KEY (`related_employee_id`) REFERENCES `hr_employees` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `hr_documents_ibfk_2` FOREIGN KEY (`related_candidate_id`) REFERENCES `hr_recruitment_candidates` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `hr_documents_ibfk_3` FOREIGN KEY (`generated_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- Table structure for `hr_employees`
+DROP TABLE IF EXISTS `hr_employees`;
+CREATE TABLE `hr_employees` (
+  `id` int(11) unsigned NOT NULL AUTO_INCREMENT,
+  `user_id` int(10) unsigned NOT NULL,
+  `employee_code` varchar(50) NOT NULL,
+  `department_id` int(11) unsigned DEFAULT NULL,
+  `designation_id` int(11) unsigned DEFAULT NULL,
+  `join_date` date NOT NULL,
+  `dob` date DEFAULT NULL,
+  `termination_date` date DEFAULT NULL,
+  `employment_status` enum('full_time','part_time','contract','intern') DEFAULT 'full_time',
+  `date_of_birth` date DEFAULT NULL,
+  `gender` enum('male','female','other') DEFAULT NULL,
+  `passport_path` varchar(255) DEFAULT NULL,
+  `signature_path` varchar(255) DEFAULT NULL,
+  `address` text DEFAULT NULL,
+  `secondary_phone` varchar(50) DEFAULT NULL,
+  `emergency_contact_name` varchar(255) DEFAULT NULL,
+  `emergency_contact_phone` varchar(50) DEFAULT NULL,
+  `next_of_kin_name` varchar(255) DEFAULT NULL,
+  `next_of_kin_phone` varchar(50) DEFAULT NULL,
+  `next_of_kin_relationship` varchar(100) DEFAULT NULL,
+  `reference_1_name` varchar(255) DEFAULT NULL,
+  `reference_1_phone` varchar(50) DEFAULT NULL,
+  `reference_1_org` varchar(255) DEFAULT NULL,
+  `reference_2_name` varchar(255) DEFAULT NULL,
+  `reference_2_phone` varchar(50) DEFAULT NULL,
+  `reference_2_org` varchar(255) DEFAULT NULL,
+  `bank_name` varchar(255) DEFAULT NULL,
+  `account_number` varchar(50) DEFAULT NULL,
+  `account_name` varchar(255) DEFAULT NULL,
+  `nin_number` varchar(50) DEFAULT NULL,
+  `bvn_number` varchar(50) DEFAULT NULL,
+  `tin_number` varchar(50) DEFAULT NULL,
+  `basic_salary` decimal(15,2) DEFAULT 0.00,
+  `housing_allowance` decimal(15,2) DEFAULT 0.00,
+  `transport_allowance` decimal(15,2) DEFAULT 0.00,
+  `other_allowances` decimal(15,2) DEFAULT 0.00,
+  `tax_deduction` decimal(15,2) DEFAULT 0.00,
+  `pension_deduction` decimal(15,2) DEFAULT 0.00,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `phone` varchar(50) DEFAULT NULL,
+  `full_name` varchar(100) NOT NULL DEFAULT '',
+  `email` varchar(100) DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `employee_code` (`employee_code`),
+  KEY `user_id` (`user_id`),
+  KEY `department_id` (`department_id`),
+  KEY `designation_id` (`designation_id`),
+  CONSTRAINT `hr_employees_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `hr_employees_ibfk_2` FOREIGN KEY (`department_id`) REFERENCES `hr_departments` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `hr_employees_ibfk_3` FOREIGN KEY (`designation_id`) REFERENCES `hr_designations` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- Table structure for `hr_leave_requests`
+DROP TABLE IF EXISTS `hr_leave_requests`;
+CREATE TABLE `hr_leave_requests` (
+  `id` int(11) unsigned NOT NULL AUTO_INCREMENT,
+  `employee_id` int(11) unsigned NOT NULL,
+  `leave_type` enum('annual','sick','casual','maternity','paternity','unpaid') NOT NULL,
+  `start_date` date NOT NULL,
+  `end_date` date NOT NULL,
+  `reason` text DEFAULT NULL,
+  `status` enum('pending','approved','rejected') DEFAULT 'pending',
+  `approved_by` int(10) unsigned DEFAULT NULL,
+  `rejection_reason` text DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `employee_id` (`employee_id`),
+  KEY `approved_by` (`approved_by`),
+  CONSTRAINT `hr_leave_requests_ibfk_1` FOREIGN KEY (`employee_id`) REFERENCES `hr_employees` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `hr_leave_requests_ibfk_2` FOREIGN KEY (`approved_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- Table structure for `hr_onboarding_codes`
+DROP TABLE IF EXISTS `hr_onboarding_codes`;
+CREATE TABLE `hr_onboarding_codes` (
+  `id` int(11) unsigned NOT NULL AUTO_INCREMENT,
+  `code` varchar(20) NOT NULL,
+  `role` varchar(50) DEFAULT 'employee',
+  `is_used` tinyint(1) DEFAULT 0,
+  `created_by` int(11) unsigned DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `unique_code` (`code`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- Table structure for `hr_onboarding_entries`
+DROP TABLE IF EXISTS `hr_onboarding_entries`;
+CREATE TABLE `hr_onboarding_entries` (
+  `id` int(11) unsigned NOT NULL AUTO_INCREMENT,
+  `code_id` int(11) unsigned NOT NULL,
+  `signup_code` varchar(20) NOT NULL,
+  `full_name` varchar(100) DEFAULT NULL,
+  `phone` varchar(20) DEFAULT NULL,
+  `email` varchar(100) DEFAULT NULL,
+  `date_of_birth` date DEFAULT NULL,
+  `gender` enum('male','female','other') DEFAULT NULL,
+  `address` text DEFAULT NULL,
+  `passport_path` varchar(255) DEFAULT NULL,
+  `signature_path` varchar(255) DEFAULT NULL,
+  `nin_number` varchar(50) DEFAULT NULL,
+  `bvn_number` varchar(50) DEFAULT NULL,
+  `next_of_kin_name` varchar(255) DEFAULT NULL,
+  `next_of_kin_phone` varchar(50) DEFAULT NULL,
+  `next_of_kin_relationship` varchar(100) DEFAULT NULL,
+  `status` enum('pending','submitted','rejected','imported') DEFAULT 'pending',
+  `admin_feedback` text DEFAULT NULL,
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `unique_code_entry` (`code_id`),
+  KEY `idx_code_id` (`code_id`),
+  CONSTRAINT `hr_onboarding_entries_ibfk_1` FOREIGN KEY (`code_id`) REFERENCES `hr_onboarding_codes` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- Table structure for `hr_payroll`
+DROP TABLE IF EXISTS `hr_payroll`;
+CREATE TABLE `hr_payroll` (
+  `id` int(11) unsigned NOT NULL AUTO_INCREMENT,
+  `employee_id` int(11) unsigned NOT NULL,
+  `month` int(2) NOT NULL,
+  `year` int(4) NOT NULL,
+  `basic_salary` decimal(15,2) NOT NULL DEFAULT 0.00,
+  `allowances` decimal(15,2) NOT NULL DEFAULT 0.00,
+  `commission` decimal(15,2) NOT NULL DEFAULT 0.00,
+  `bonus` decimal(15,2) NOT NULL DEFAULT 0.00,
+  `overtime` decimal(15,2) NOT NULL DEFAULT 0.00,
+  `deductions` decimal(15,2) NOT NULL DEFAULT 0.00,
+  `tax` decimal(15,2) NOT NULL DEFAULT 0.00,
+  `net_salary` decimal(15,2) NOT NULL DEFAULT 0.00,
+  `status` enum('generated','approved','paid') DEFAULT 'generated',
+  `payment_date` date DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `unique_payroll` (`employee_id`,`month`,`year`),
+  KEY `idx_employee_id` (`employee_id`),
+  CONSTRAINT `hr_payroll_ibfk_1` FOREIGN KEY (`employee_id`) REFERENCES `hr_employees` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- Table structure for `hr_recruitment_candidates`
+DROP TABLE IF EXISTS `hr_recruitment_candidates`;
+CREATE TABLE `hr_recruitment_candidates` (
+  `id` int(11) unsigned NOT NULL AUTO_INCREMENT,
+  `first_name` varchar(255) NOT NULL,
+  `last_name` varchar(255) NOT NULL,
+  `email` varchar(255) NOT NULL,
+  `phone` varchar(50) DEFAULT NULL,
+  `applied_for_role` varchar(255) DEFAULT NULL,
+  `resume_path` varchar(255) DEFAULT NULL,
+  `status` enum('new','shortlisted','interviewed','hired','rejected') DEFAULT 'new',
+  `interview_date` datetime DEFAULT NULL,
+  `interview_notes` text DEFAULT NULL,
+  `ai_screening_score` int(3) DEFAULT NULL,
+  `ai_screening_summary` text DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- Table structure for `hr_settings`
+DROP TABLE IF EXISTS `hr_settings`;
+CREATE TABLE `hr_settings` (
+  `id` int(11) unsigned NOT NULL AUTO_INCREMENT,
+  `setting_key` varchar(50) NOT NULL,
+  `setting_value` text DEFAULT NULL,
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `unique_key` (`setting_key`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- Table structure for `hr_votes`
+DROP TABLE IF EXISTS `hr_votes`;
+CREATE TABLE `hr_votes` (
+  `id` int(11) unsigned NOT NULL AUTO_INCREMENT,
+  `voter_id` int(11) unsigned NOT NULL,
+  `candidate_id` int(11) unsigned NOT NULL,
+  `month` int(2) NOT NULL,
+  `year` int(4) NOT NULL,
+  `reason` text DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `unique_vote` (`voter_id`,`month`,`year`),
+  KEY `candidate_id` (`candidate_id`),
+  CONSTRAINT `hr_votes_ibfk_1` FOREIGN KEY (`voter_id`) REFERENCES `hr_employees` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `hr_votes_ibfk_2` FOREIGN KEY (`candidate_id`) REFERENCES `hr_employees` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- Table structure for `invoice_line_items`
+DROP TABLE IF EXISTS `invoice_line_items`;
+CREATE TABLE `invoice_line_items` (
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `invoice_id` int(10) unsigned NOT NULL,
+  `product_id` int(10) unsigned DEFAULT NULL,
+  `item_number` int(11) NOT NULL,
+  `quantity` decimal(10,2) NOT NULL,
+  `description` text NOT NULL,
+  `unit_price` decimal(15,2) NOT NULL,
+  `vat_applicable` tinyint(1) DEFAULT 0,
+  `vat_amount` decimal(15,2) NOT NULL DEFAULT 0.00,
+  `line_total` decimal(15,2) NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `product_id` (`product_id`),
+  KEY `idx_invoice_id` (`invoice_id`),
+  CONSTRAINT `invoice_line_items_ibfk_1` FOREIGN KEY (`invoice_id`) REFERENCES `invoices` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `invoice_line_items_ibfk_2` FOREIGN KEY (`product_id`) REFERENCES `products` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Quote line items
-CREATE TABLE IF NOT EXISTS quote_line_items (
-    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    quote_id INT UNSIGNED NOT NULL,
-    product_id INT UNSIGNED,
-    item_number INT NOT NULL,
-    quantity DECIMAL(10,2) NOT NULL,
-    description TEXT NOT NULL,
-    unit_price DECIMAL(15,2) NOT NULL,
-    vat_applicable TINYINT(1) DEFAULT 0,
-    vat_amount DECIMAL(15,2) NOT NULL DEFAULT 0.00,
-    line_total DECIMAL(15,2) NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (quote_id) REFERENCES quotes(id) ON DELETE CASCADE,
-    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE SET NULL,
-    INDEX idx_quote_id (quote_id)
+-- Table structure for `invoices`
+DROP TABLE IF EXISTS `invoices`;
+CREATE TABLE `invoices` (
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `invoice_number` varchar(50) NOT NULL,
+  `quote_id` int(10) unsigned DEFAULT NULL,
+  `invoice_title` varchar(255) NOT NULL,
+  `customer_id` int(10) unsigned DEFAULT NULL,
+  `customer_name` varchar(255) NOT NULL,
+  `salesperson` varchar(255) NOT NULL,
+  `invoice_date` date NOT NULL,
+  `due_date` date DEFAULT NULL,
+  `subtotal` decimal(15,2) NOT NULL DEFAULT 0.00,
+  `total_vat` decimal(15,2) NOT NULL DEFAULT 0.00,
+  `grand_total` decimal(15,2) NOT NULL DEFAULT 0.00,
+  `amount_paid` decimal(15,2) NOT NULL DEFAULT 0.00,
+  `balance_due` decimal(15,2) NOT NULL DEFAULT 0.00,
+  `payment_terms` varchar(255) DEFAULT NULL,
+  `status` enum('draft','sent','paid','overdue','cancelled','partial','finalized') DEFAULT 'draft',
+  `notes` text DEFAULT NULL,
+  `created_by` int(10) unsigned DEFAULT NULL,
+  `is_archived` tinyint(1) DEFAULT 0,
+  `deleted_at` timestamp NULL DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `invoice_number` (`invoice_number`),
+  KEY `created_by` (`created_by`),
+  KEY `quote_id` (`quote_id`),
+  KEY `idx_invoice_number` (`invoice_number`),
+  KEY `idx_customer_name` (`customer_name`),
+  KEY `idx_status` (`status`),
+  KEY `idx_due_date` (`due_date`),
+  KEY `idx_created_at` (`created_at`),
+  KEY `idx_customer_id_quote_id` (`customer_id`,`quote_id`),
+  CONSTRAINT `invoices_ibfk_1` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `invoices_ibfk_2` FOREIGN KEY (`quote_id`) REFERENCES `quotes` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `invoices_ibfk_3` FOREIGN KEY (`customer_id`) REFERENCES `customers` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Invoices table
-CREATE TABLE IF NOT EXISTS invoices (
-    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    invoice_number VARCHAR(50) UNIQUE NOT NULL,
-    quote_id INT UNSIGNED,
-    invoice_title VARCHAR(255) NOT NULL,
-    customer_id INT UNSIGNED,
-    customer_name VARCHAR(255) NOT NULL,
-    salesperson VARCHAR(255) NOT NULL,
-    invoice_date DATE NOT NULL,
-    due_date DATE,
-    subtotal DECIMAL(15,2) NOT NULL DEFAULT 0.00,
-    total_vat DECIMAL(15,2) NOT NULL DEFAULT 0.00,
-    grand_total DECIMAL(15,2) NOT NULL DEFAULT 0.00,
-    amount_paid DECIMAL(15,2) NOT NULL DEFAULT 0.00,
-    balance_due DECIMAL(15,2) NOT NULL DEFAULT 0.00,
-    payment_terms VARCHAR(255),
-    status ENUM('draft', 'sent', 'paid', 'partially_paid', 'overdue', 'cancelled', 'finalized') DEFAULT 'draft',
-    notes TEXT,
-    created_by INT UNSIGNED,
-    is_archived TINYINT(1) DEFAULT 0,
-    deleted_at TIMESTAMP NULL DEFAULT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL,
-    FOREIGN KEY (quote_id) REFERENCES quotes(id) ON DELETE SET NULL,
-    FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE SET NULL,
-    INDEX idx_invoice_number (invoice_number),
-    INDEX idx_customer_name (customer_name),
-    INDEX idx_status (status),
-    INDEX idx_due_date (due_date),
-    INDEX idx_created_at (created_at)
+-- Table structure for `market_data`
+DROP TABLE IF EXISTS `market_data`;
+CREATE TABLE `market_data` (
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `data_type` varchar(50) NOT NULL,
+  `data_key` varchar(100) NOT NULL,
+  `data_value` decimal(15,2) NOT NULL,
+  `effective_date` date NOT NULL,
+  `notes` text DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `unique_data` (`data_type`,`data_key`,`effective_date`),
+  KEY `idx_data_type` (`data_type`),
+  KEY `idx_effective_date` (`effective_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Invoice line items
-CREATE TABLE IF NOT EXISTS invoice_line_items (
-    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    invoice_id INT UNSIGNED NOT NULL,
-    product_id INT UNSIGNED,
-    item_number INT NOT NULL,
-    quantity DECIMAL(10,2) NOT NULL,
-    description TEXT NOT NULL,
-    unit_price DECIMAL(15,2) NOT NULL,
-    vat_applicable TINYINT(1) DEFAULT 0,
-    vat_amount DECIMAL(15,2) NOT NULL DEFAULT 0.00,
-    line_total DECIMAL(15,2) NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (invoice_id) REFERENCES invoices(id) ON DELETE CASCADE,
-    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE SET NULL,
-    INDEX idx_invoice_id (invoice_id)
+-- Table structure for `payments`
+DROP TABLE IF EXISTS `payments`;
+CREATE TABLE `payments` (
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `customer_id` int(10) unsigned NOT NULL,
+  `amount` decimal(15,2) NOT NULL,
+  `payment_date` date NOT NULL,
+  `payment_method` varchar(50) DEFAULT NULL,
+  `reference` varchar(100) DEFAULT NULL,
+  `notes` text DEFAULT NULL,
+  `created_by` int(10) unsigned DEFAULT NULL,
+  `payment_number` varchar(50) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `deleted_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `created_by` (`created_by`),
+  KEY `idx_payment_date` (`payment_date`),
+  KEY `idx_customer_id` (`customer_id`),
+  CONSTRAINT `payments_ibfk_1` FOREIGN KEY (`customer_id`) REFERENCES `customers` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `payments_ibfk_2` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Receipts table
-CREATE TABLE IF NOT EXISTS receipts (
-    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    receipt_number VARCHAR(50) UNIQUE NOT NULL,
-    invoice_id INT UNSIGNED,
-    customer_id INT UNSIGNED,
-    customer_name VARCHAR(255) NOT NULL,
-    amount_paid DECIMAL(15,2) NOT NULL,
-    payment_method ENUM('cash', 'bank_transfer', 'cheque', 'card', 'other') DEFAULT 'cash',
-    payment_date DATE NOT NULL,
-    reference_number VARCHAR(100),
-    notes TEXT,
-    payment_id INT UNSIGNED DEFAULT NULL,
-    status ENUM('valid','void') DEFAULT 'valid',
-    created_by INT UNSIGNED,
-    is_archived TINYINT(1) DEFAULT 0,
-    deleted_at TIMESTAMP NULL DEFAULT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL,
-    FOREIGN KEY (invoice_id) REFERENCES invoices(id) ON DELETE SET NULL,
-    FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE SET NULL,
-    INDEX idx_receipt_number (receipt_number),
-    INDEX idx_customer_name (customer_name),
-    INDEX idx_created_at (created_at)
+-- Table structure for `products`
+DROP TABLE IF EXISTS `products`;
+CREATE TABLE `products` (
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `product_code` varchar(50) NOT NULL,
+  `product_name` varchar(255) NOT NULL,
+  `category` varchar(100) DEFAULT 'General',
+  `description` text DEFAULT NULL,
+  `unit_price` decimal(15,2) NOT NULL DEFAULT 0.00,
+  `vat_applicable` tinyint(1) DEFAULT 1,
+  `is_active` tinyint(1) DEFAULT 1,
+  `created_by` int(10) unsigned DEFAULT NULL,
+  `deleted_at` timestamp NULL DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `product_code` (`product_code`),
+  KEY `idx_product_code` (`product_code`),
+  KEY `idx_product_name` (`product_name`),
+  KEY `idx_category` (`category`),
+  KEY `idx_is_active` (`is_active`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Payments table
-CREATE TABLE IF NOT EXISTS payments (
-  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  customer_id INT UNSIGNED NOT NULL,
-  amount DECIMAL(15,2) NOT NULL,
-  payment_date DATE NOT NULL,
-  payment_method VARCHAR(50) DEFAULT NULL,
-  reference VARCHAR(100) DEFAULT NULL,
-  notes TEXT DEFAULT NULL,
-  created_by INT UNSIGNED DEFAULT NULL,
-  payment_number VARCHAR(50) DEFAULT NULL,
-  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE,
-  FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL,
-  INDEX idx_payment_date (payment_date),
-  INDEX idx_customer_id (customer_id)
+-- Table structure for `proposals`
+DROP TABLE IF EXISTS `proposals`;
+CREATE TABLE `proposals` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `title` varchar(255) NOT NULL,
+  `content` longtext DEFAULT NULL,
+  `system_specs` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`system_specs`)),
+  `status` enum('draft','sent','accepted','rejected') DEFAULT 'draft',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `converted_quote_id` int(11) DEFAULT NULL,
+  PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ============================================
--- READY-MADE QUOTES
--- ============================================
-
--- Readymade quote categories
-CREATE TABLE IF NOT EXISTS readymade_quote_categories (
-    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    category_name VARCHAR(255) NOT NULL,
-    description TEXT,
-    is_active TINYINT(1) DEFAULT 1,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    INDEX idx_category_name (category_name)
+-- Table structure for `quote_line_items`
+DROP TABLE IF EXISTS `quote_line_items`;
+CREATE TABLE `quote_line_items` (
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `quote_id` int(10) unsigned NOT NULL,
+  `product_id` int(10) unsigned DEFAULT NULL,
+  `item_number` int(11) NOT NULL,
+  `quantity` decimal(10,2) NOT NULL,
+  `description` text NOT NULL,
+  `unit_price` decimal(15,2) NOT NULL,
+  `vat_applicable` tinyint(1) DEFAULT 0,
+  `vat_amount` decimal(15,2) NOT NULL DEFAULT 0.00,
+  `line_total` decimal(15,2) NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `product_id` (`product_id`),
+  KEY `idx_quote_id` (`quote_id`),
+  CONSTRAINT `quote_line_items_ibfk_1` FOREIGN KEY (`quote_id`) REFERENCES `quotes` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `quote_line_items_ibfk_2` FOREIGN KEY (`product_id`) REFERENCES `products` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Insert default category
-INSERT INTO readymade_quote_categories (id, category_name, description) VALUES (1, 'General', 'Default Category');
-
--- Readymade quote templates
-CREATE TABLE IF NOT EXISTS readymade_quote_templates (
-    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    category_id INT UNSIGNED NOT NULL,
-    template_name VARCHAR(255) NOT NULL,
-    description TEXT,
-    payment_terms TEXT DEFAULT NULL,
-    default_project_title VARCHAR(255) DEFAULT NULL,
-    subtotal DECIMAL(15,2) NOT NULL DEFAULT 0.00,
-    total_vat DECIMAL(15,2) NOT NULL DEFAULT 0.00,
-    grand_total DECIMAL(15,2) NOT NULL DEFAULT 0.00,
-    is_active TINYINT(1) DEFAULT 1,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (category_id) REFERENCES readymade_quote_categories(id) ON DELETE CASCADE,
-    INDEX idx_template_name (template_name),
-    INDEX idx_category_id (category_id)
+-- Table structure for `quotes`
+DROP TABLE IF EXISTS `quotes`;
+CREATE TABLE `quotes` (
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `quote_number` varchar(50) NOT NULL,
+  `quote_title` varchar(255) NOT NULL,
+  `customer_id` int(10) unsigned DEFAULT NULL,
+  `customer_name` varchar(255) NOT NULL,
+  `salesperson` varchar(255) NOT NULL,
+  `quote_date` date NOT NULL,
+  `subtotal` decimal(15,2) NOT NULL DEFAULT 0.00,
+  `total_vat` decimal(15,2) NOT NULL DEFAULT 0.00,
+  `grand_total` decimal(15,2) NOT NULL DEFAULT 0.00,
+  `payment_terms` varchar(255) DEFAULT '80% Initial Deposit',
+  `delivery_period` varchar(255) DEFAULT NULL,
+  `status` enum('draft','finalized','approved','rejected','expired') DEFAULT 'draft',
+  `notes` text DEFAULT NULL,
+  `created_by` int(10) unsigned DEFAULT NULL,
+  `is_archived` tinyint(1) DEFAULT 0,
+  `deleted_at` timestamp NULL DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `quote_number` (`quote_number`),
+  KEY `created_by` (`created_by`),
+  KEY `idx_quote_number` (`quote_number`),
+  KEY `idx_customer_name` (`customer_name`),
+  KEY `idx_status` (`status`),
+  KEY `idx_created_at` (`created_at`),
+  KEY `idx_customer_id_status` (`customer_id`,`status`),
+  CONSTRAINT `quotes_ibfk_1` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `quotes_ibfk_2` FOREIGN KEY (`customer_id`) REFERENCES `customers` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Readymade quote template items
-CREATE TABLE IF NOT EXISTS readymade_quote_template_items (
-    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    template_id INT UNSIGNED NOT NULL,
-    product_id INT UNSIGNED,
-    item_number INT NOT NULL,
-    quantity DECIMAL(10,2) NOT NULL,
-    description TEXT NOT NULL,
-    unit_price DECIMAL(15,2) NOT NULL,
-    vat_applicable TINYINT(1) DEFAULT 0,
-    vat_amount DECIMAL(15,2) NOT NULL DEFAULT 0.00,
-    line_total DECIMAL(15,2) NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (template_id) REFERENCES readymade_quote_templates(id) ON DELETE CASCADE,
-    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE SET NULL,
-    INDEX idx_template_id (template_id)
+-- Table structure for `readymade_quote_categories`
+DROP TABLE IF EXISTS `readymade_quote_categories`;
+CREATE TABLE `readymade_quote_categories` (
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `category_name` varchar(255) NOT NULL,
+  `description` text DEFAULT NULL,
+  `is_active` tinyint(1) DEFAULT 1,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `idx_category_name` (`category_name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ============================================
--- BANK ACCOUNTS
--- ============================================
-
-CREATE TABLE IF NOT EXISTS bank_accounts (
-    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    bank_name VARCHAR(255) NOT NULL,
-    account_number VARCHAR(50) NOT NULL,
-    account_name VARCHAR(255) NOT NULL,
-    is_active TINYINT(1) DEFAULT 1,
-    show_on_documents TINYINT(1) DEFAULT 0,
-    display_order INT DEFAULT 0,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    INDEX idx_bank_name (bank_name),
-    INDEX idx_is_active (is_active),
-    INDEX idx_display_order (display_order)
+-- Table structure for `readymade_quote_template_items`
+DROP TABLE IF EXISTS `readymade_quote_template_items`;
+CREATE TABLE `readymade_quote_template_items` (
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `template_id` int(10) unsigned NOT NULL,
+  `product_id` int(10) unsigned DEFAULT NULL,
+  `item_number` int(11) NOT NULL,
+  `quantity` decimal(10,2) NOT NULL,
+  `description` text NOT NULL,
+  `unit_price` decimal(15,2) NOT NULL,
+  `vat_applicable` tinyint(1) DEFAULT 0,
+  `vat_amount` decimal(15,2) NOT NULL DEFAULT 0.00,
+  `line_total` decimal(15,2) NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `product_id` (`product_id`),
+  KEY `idx_template_id` (`template_id`),
+  CONSTRAINT `readymade_quote_template_items_ibfk_1` FOREIGN KEY (`template_id`) REFERENCES `readymade_quote_templates` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `readymade_quote_template_items_ibfk_2` FOREIGN KEY (`product_id`) REFERENCES `products` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ============================================
--- AUD IT LOG
--- ============================================
-
-CREATE TABLE IF NOT EXISTS audit_log (
-    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    user_id INT UNSIGNED,
-    action VARCHAR(50) NOT NULL,
-    resource_type VARCHAR(50),
-    resource_id INT UNSIGNED,
-    ip_address VARCHAR(45),
-    user_agent TEXT,
-    details JSON,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
-    INDEX idx_user_id (user_id),
-    INDEX idx_action (action),
-    INDEX idx_resource (resource_type, resource_id),
-    INDEX idx_created_at (created_at)
+-- Table structure for `readymade_quote_templates`
+DROP TABLE IF EXISTS `readymade_quote_templates`;
+CREATE TABLE `readymade_quote_templates` (
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `category_id` int(10) unsigned NOT NULL,
+  `template_name` varchar(255) NOT NULL,
+  `description` text DEFAULT NULL,
+  `payment_terms` text DEFAULT NULL,
+  `default_project_title` varchar(255) DEFAULT NULL,
+  `subtotal` decimal(15,2) NOT NULL DEFAULT 0.00,
+  `total_vat` decimal(15,2) NOT NULL DEFAULT 0.00,
+  `grand_total` decimal(15,2) NOT NULL DEFAULT 0.00,
+  `is_active` tinyint(1) DEFAULT 1,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `idx_template_name` (`template_name`),
+  KEY `idx_category_id` (`category_id`),
+  CONSTRAINT `readymade_quote_templates_ibfk_1` FOREIGN KEY (`category_id`) REFERENCES `readymade_quote_categories` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ============================================
--- SETTINGS TABLE
--- ============================================
-
-CREATE TABLE IF NOT EXISTS settings (
-    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    setting_key VARCHAR(255) UNIQUE NOT NULL,
-    setting_value TEXT,
-    category VARCHAR(50) DEFAULT 'system',
-    description TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    INDEX idx_setting_key (setting_key)
+-- Table structure for `receipts`
+DROP TABLE IF EXISTS `receipts`;
+CREATE TABLE `receipts` (
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `receipt_number` varchar(50) NOT NULL,
+  `invoice_id` int(10) unsigned DEFAULT NULL,
+  `customer_id` int(10) unsigned DEFAULT NULL,
+  `customer_name` varchar(255) NOT NULL,
+  `amount_paid` decimal(15,2) NOT NULL,
+  `payment_method` enum('cash','bank_transfer','cheque','card','other') DEFAULT 'cash',
+  `payment_date` date NOT NULL,
+  `reference_number` varchar(100) DEFAULT NULL,
+  `notes` text DEFAULT NULL,
+  `payment_id` int(10) unsigned DEFAULT NULL,
+  `status` enum('valid','void') DEFAULT 'valid',
+  `created_by` int(10) unsigned DEFAULT NULL,
+  `is_archived` tinyint(1) DEFAULT 0,
+  `deleted_at` timestamp NULL DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `receipt_number` (`receipt_number`),
+  UNIQUE KEY `unique_receipt_number` (`receipt_number`),
+  KEY `created_by` (`created_by`),
+  KEY `invoice_id` (`invoice_id`),
+  KEY `customer_id` (`customer_id`),
+  KEY `idx_receipt_number` (`receipt_number`),
+  KEY `idx_customer_name` (`customer_name`),
+  KEY `idx_created_at` (`created_at`),
+  CONSTRAINT `receipts_ibfk_1` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `receipts_ibfk_2` FOREIGN KEY (`invoice_id`) REFERENCES `invoices` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `receipts_ibfk_3` FOREIGN KEY (`customer_id`) REFERENCES `customers` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ============================================
--- INSTALLATION COMPLETE MARKER
--- ============================================
-
-INSERT IGNORE INTO settings (setting_key, setting_value, category, description) VALUES
-('installation_completed', '1', 'system', 'Flag indicating installation is complete'),
-('installation_date', NOW(), 'system', 'Date of installation'),
-('version', '2.0.0', 'system', 'Current system version'),
-('company_name', 'Your Company Name', 'company', 'Business Name'),
-('company_email', '', 'company', 'Business Email'),
-('company_phone', '', 'company', 'Business Phone'),
-('company_address', '', 'company', 'Business Address'),
-('company_website', '', 'company', 'Business Website'),
-('company_tax_id', '', 'company', 'Tax ID / VAT Number'),
-('groq_api_key', '', 'integrations', 'Groq AI API Key'),
-('vat_rate', '7.5', 'system', 'Default VAT Rate (%)'),
-('currency_symbol', '₦', 'display', 'Currency Symbol'),
-('email_method', 'php_mail', 'email', 'Method for sending emails (php_mail/smtp)'),
-('email_from_address', 'noreply@yourcompany.com', 'email', 'Default sender email address'),
-('email_from_name', 'Your Company Name', 'email', 'Default sender name'),
-('items_per_page', '25', 'display', 'Number of items per page in lists'),
-('show_dashboard_charts', '1', 'display', 'Toggle dashboard charts'),
-('show_recent_activity', '1', 'display', 'Toggle dashboard recent activity'),
-('pdf_quality', 'high', 'display', 'Quality of generated PDFs'),
-('theme_color', '#0076BE', 'display', 'Primary theme color'),
-('footer_text', 'We appreciate your business! Thank you', 'display', 'Default footer text for documents'),
-('quote_prefix', 'QUOT-', 'system', 'Prefix for quote numbers'),
-('invoice_prefix', 'INV-', 'system', 'Prefix for invoice numbers'),
-('receipt_prefix', 'REC-', 'system', 'Prefix for receipt numbers'),
-('date_format', 'd/m/Y', 'display', 'Date display format'),
-('auto_archive_days', '0', 'system', 'Days to auto-archive documents (0 to disable)'),
-('audit_retention_days', '90', 'audit', 'Days to keep audit logs'),
-('log_user_actions', '1', 'audit', 'Log user actions'),
-('log_document_create', '1', 'audit', 'Log document creation'),
-('log_document_edit', '1', 'audit', 'Log document editing'),
-('log_document_delete', '1', 'audit', 'Log document deletion'),
-('log_user_management', '1', 'audit', 'Log user management actions'),
-('log_settings_changes', '1', 'audit', 'Log settings changes'),
-('log_email_sent', '1', 'audit', 'Log email sending');
-
-
--- AI Rate Limiting & Usage Tracking Schema
--- Run this migration to add rate limiting capabilities
-
--- Usage logging table
-CREATE TABLE IF NOT EXISTS ai_usage_logs (
-    id INT PRIMARY KEY AUTO_INCREMENT,
-    user_id INT UNSIGNED DEFAULT NULL,
-    ip_address VARCHAR(45) NOT NULL,
-    tool_name VARCHAR(50) NOT NULL,
-    endpoint VARCHAR(100) NOT NULL,
-    request_hash VARCHAR(64),
-    tokens_used INT DEFAULT 0,
-    cost_usd DECIMAL(10,4) DEFAULT 0,
-    processing_time FLOAT,
-    success BOOLEAN DEFAULT TRUE,
-    error_message TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    INDEX idx_user_date (user_id, created_at),
-    INDEX idx_ip_date (ip_address, created_at),
-    INDEX idx_tool_date (tool_name, created_at),
-    INDEX idx_date (created_at),
-    INDEX idx_hash (request_hash),
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
--- Request caching table
-CREATE TABLE IF NOT EXISTS ai_request_cache (
-    id INT PRIMARY KEY AUTO_INCREMENT,
-    request_hash VARCHAR(64) UNIQUE NOT NULL,
-    tool_name VARCHAR(50) NOT NULL,
-    request_params TEXT NOT NULL,
-    response_data MEDIUMTEXT NOT NULL,
-    hit_count INT DEFAULT 1,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    last_accessed TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    expires_at TIMESTAMP NULL DEFAULT NULL,
-    INDEX idx_hash (request_hash),
-    INDEX idx_tool (tool_name),
-    INDEX idx_expires (expires_at)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
--- AI Settings
-INSERT INTO settings (setting_key, setting_value, category, description) VALUES
-('ai_ip_hourly_limit', '5', 'ai_limits', 'Hourly request limit for public/IP-based users'),
-('ai_ip_daily_limit', '20', 'ai_limits', 'Daily request limit for public/IP-based users'),
-('ai_user_hourly_limit', '10', 'ai_limits', 'Hourly request limit for authenticated users'),
-('ai_user_daily_limit', '50', 'ai_limits', 'Daily request limit for authenticated users'),
-('ai_monthly_budget_usd', '100', 'ai_limits', 'Monthly API budget in USD'),
-('ai_enable_caching', '1', 'ai_features', 'Enable response caching'),
-('ai_cache_ttl_hours', '24', 'ai_features', 'Cache time-to-live in hours'),
-('ai_enable_public_access', '1', 'ai_features', 'Allow public access to AI tools'),
-('ai_public_tools', 'system_designer', 'ai_features', 'Comma-separated list of public tools'),
-('ai_log_retention_days', '90', 'ai_features', 'Days to retain usage logs'),
-('ai_emergency_disable', '0', 'ai_features', 'Emergency disable all AI features')
-ON DUPLICATE KEY UPDATE setting_value=VALUES(setting_value);
-
--- Create cleanup event for old logs (runs daily at 2 AM)
-CREATE EVENT IF NOT EXISTS cleanup_old_ai_logs
-ON SCHEDULE EVERY 1 DAY
-STARTS CONCAT(CURDATE() + INTERVAL 1 DAY, ' 02:00:00')
-DO
-    DELETE FROM ai_usage_logs 
-    WHERE created_at < DATE_SUB(NOW(), INTERVAL (SELECT setting_value FROM settings WHERE setting_key = 'ai_log_retention_days') DAY);
-
--- Create cleanup event for expired cache (runs every hour)
-CREATE EVENT IF NOT EXISTS cleanup_expired_cache
-ON SCHEDULE EVERY 1 HOUR
-DO
-    DELETE FROM ai_request_cache WHERE expires_at < NOW();
-
--- ============================================
--- AI RECOMMENDATIONS LOG
--- ============================================
-
-CREATE TABLE IF NOT EXISTS ai_recommendations (
-    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    user_id INT UNSIGNED,
-    customer_name VARCHAR(255),
-    customer_description TEXT NOT NULL,
-    appliances_json JSON,
-    power_analysis JSON,
-    recommended_system JSON NOT NULL,
-    roi_analysis JSON NOT NULL,
-    quote_id INT UNSIGNED,
-    created_quote TINYINT(1) DEFAULT 0,
-    model_used VARCHAR(50) DEFAULT 'groq-llama-3.1-70b',
-    processing_time_ms INT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
-    FOREIGN KEY (quote_id) REFERENCES quotes(id) ON DELETE SET NULL,
-    INDEX idx_user_id (user_id),
-    INDEX idx_created_at (created_at),
-    INDEX idx_customer_name (customer_name)
+-- Table structure for `settings`
+DROP TABLE IF EXISTS `settings`;
+CREATE TABLE `settings` (
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `setting_key` varchar(255) NOT NULL,
+  `setting_value` text DEFAULT NULL,
+  `category` varchar(50) DEFAULT 'system',
+  `description` text DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `setting_key` (`setting_key`),
+  KEY `idx_setting_key` (`setting_key`),
+  KEY `idx_category` (`category`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ============================================
--- NIGERIAN MARKET DATA
--- ============================================
-
-CREATE TABLE IF NOT EXISTS market_data (
-    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    data_type VARCHAR(50) NOT NULL,
-    data_key VARCHAR(100) NOT NULL,
-    data_value DECIMAL(15,2) NOT NULL,
-    effective_date DATE NOT NULL,
-    notes TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    UNIQUE KEY unique_data (data_type, data_key, effective_date),
-    INDEX idx_data_type (data_type),
-    INDEX idx_effective_date (effective_date)
+-- Table structure for `users`
+DROP TABLE IF EXISTS `users`;
+CREATE TABLE `users` (
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `username` varchar(50) NOT NULL,
+  `password` varchar(255) NOT NULL,
+  `full_name` varchar(255) NOT NULL,
+  `email` varchar(255) NOT NULL,
+  `role` enum('admin','manager','sales','viewer') DEFAULT 'sales',
+  `is_active` tinyint(1) DEFAULT 1,
+  `signature_file` varchar(255) DEFAULT NULL,
+  `last_login` timestamp NULL DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `phone` varchar(20) DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `username` (`username`),
+  UNIQUE KEY `email` (`email`),
+  KEY `idx_username` (`username`),
+  KEY `idx_email` (`email`),
+  KEY `idx_role` (`role`),
+  KEY `idx_phone` (`phone`),
+  KEY `idx_full_name` (`full_name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Insert current Nigerian market data
-INSERT IGNORE INTO market_data (data_type, data_key, data_value, effective_date, notes) VALUES
-('fuel_price', 'petrol_per_litre', 650, '2026-01-01', 'Average petrol price in Nigeria'),
-('fuel_price', 'diesel_per_litre', 850, '2026-01-01', 'Average diesel price in Nigeria'),
-('electricity', 'nepa_per_kwh_residential', 68, '2026-01-01', 'NEPA residential tariff (average)'),
-('electricity', 'nepa_per_kwh_commercial', 85, '2026-01-01', 'NEPA commercial tariff (average)'),
-('generator', 'running_cost_per_hour_2.5kva', 300, '2026-01-01', 'Small generator fuel cost'),
-('generator', 'running_cost_per_hour_5kva', 500, '2026-01-01', 'Medium generator fuel cost'),
-('generator', 'running_cost_per_hour_10kva', 900, '2026-01-01', 'Large generator fuel cost'),
-('generator', 'maintenance_per_month_2.5kva', 8000, '2026-01-01', 'Oil, servicing, repairs'),
-('generator', 'maintenance_per_month_5kva', 15000, '2026-01-01', 'Oil, servicing, repairs'),
-('generator', 'maintenance_per_month_10kva', 25000, '2026-01-01', 'Oil, servicing, repairs'),
-('solar', 'avg_sun_hours_per_day', 5.5, '2026-01-01', 'Average sun hours in Nigeria'),
-('solar', 'performance_degradation_annual', 0.5, '2026-01-01', 'Annual panel efficiency loss %'),
-('inflation', 'annual_rate', 24, '2026-01-01', 'Nigeria inflation rate'),
-('currency', 'usd_to_ngn', 1600, '2026-01-01', 'Exchange rate USD to Naira');
+-- Seed data for `settings`
+INSERT INTO `settings` (`id`, `setting_key`, `setting_value`, `category`, `description`, `created_at`, `updated_at`) VALUES 
+('1', 'installation_completed', '1', 'system', NULL, '2026-01-26 22:41:16', '2026-01-26 22:41:16'),
+('2', 'installation_date', '2026-01-26 22:41:16', 'system', NULL, '2026-01-26 22:41:16', '2026-01-26 22:41:16'),
+('3', 'version', '2.0.0', 'system', NULL, '2026-01-26 22:41:16', '2026-01-26 22:41:16'),
+('4', 'company_name', 'GOLDCOAST ELECTRICALS', 'system', NULL, '2026-01-26 22:41:16', '2026-01-29 09:06:27'),
+('5', 'company_email', 'goldcoastlogisticsnigltd@gmail.com', 'system', NULL, '2026-01-26 22:41:16', '2026-01-29 08:57:57'),
+('6', 'company_phone', '07052066295', 'system', NULL, '2026-01-26 22:41:16', '2026-01-29 08:57:57'),
+('7', 'company_address', '100 Country Home Motel Road,\r\nBenin City, Edo State.', 'system', NULL, '2026-01-26 22:41:16', '2026-01-29 09:06:27'),
+('8', 'company_website', 'www.bluedots.com.ng', 'system', NULL, '2026-01-26 22:41:16', '2026-02-03 05:16:38'),
+('9', 'company_tax_id', '', 'system', NULL, '2026-01-26 22:41:16', '2026-01-26 22:41:16'),
+('10', 'vat_rate', '7.5', 'system', NULL, '2026-01-26 22:41:16', '2026-01-26 22:41:16'),
+('11', 'currency_symbol', '₦', 'system', NULL, '2026-01-26 22:41:16', '2026-01-26 22:41:16'),
+('12', 'email_method', 'php_mail', 'system', NULL, '2026-01-26 22:41:16', '2026-01-26 22:41:16'),
+('13', 'email_from_address', 'noreply@yourcompany.com', 'system', NULL, '2026-01-26 22:41:16', '2026-01-26 22:41:16'),
+('14', 'email_from_name', 'Your Company Name', 'system', NULL, '2026-01-26 22:41:16', '2026-01-26 22:41:16'),
+('15', 'items_per_page', '25', 'system', NULL, '2026-01-26 22:41:16', '2026-01-26 22:41:16'),
+('16', 'show_dashboard_charts', '1', 'system', NULL, '2026-01-26 22:41:16', '2026-01-26 22:41:16'),
+('17', 'show_recent_activity', '1', 'system', NULL, '2026-01-26 22:41:16', '2026-01-26 22:41:16'),
+('18', 'pdf_quality', 'high', 'system', NULL, '2026-01-26 22:41:16', '2026-01-26 22:41:16'),
+('19', 'theme_color', '#e77913', 'system', NULL, '2026-01-26 22:41:16', '2026-01-29 08:45:00'),
+('20', 'footer_text', 'We appreciate your business! Thank you', 'system', NULL, '2026-01-26 22:41:16', '2026-01-26 22:41:16'),
+('21', 'quote_prefix', 'QUOT-', 'system', NULL, '2026-01-26 22:41:16', '2026-01-26 22:41:16'),
+('22', 'invoice_prefix', 'INV-', 'system', NULL, '2026-01-26 22:41:16', '2026-01-26 22:41:16'),
+('23', 'receipt_prefix', 'REC-', 'system', NULL, '2026-01-26 22:41:16', '2026-01-26 22:41:16'),
+('24', 'date_format', 'd/m/Y', 'system', NULL, '2026-01-26 22:41:16', '2026-01-26 22:41:16'),
+('25', 'auto_archive_days', '0', 'system', NULL, '2026-01-26 22:41:16', '2026-01-26 22:41:16'),
+('26', 'audit_retention_days', '90', 'system', NULL, '2026-01-26 22:41:16', '2026-01-26 22:41:16'),
+('27', 'log_user_actions', '1', 'system', NULL, '2026-01-26 22:41:16', '2026-01-26 22:41:16'),
+('28', 'log_document_create', '1', 'system', NULL, '2026-01-26 22:41:16', '2026-01-26 22:41:16'),
+('29', 'log_document_edit', '1', 'system', NULL, '2026-01-26 22:41:16', '2026-01-26 22:41:16'),
+('30', 'log_document_delete', '1', 'system', NULL, '2026-01-26 22:41:16', '2026-01-26 22:41:16'),
+('31', 'log_user_management', '1', 'system', NULL, '2026-01-26 22:41:16', '2026-01-26 22:41:16'),
+('32', 'log_settings_changes', '1', 'system', NULL, '2026-01-26 22:41:16', '2026-01-26 22:41:16'),
+('33', 'log_email_sent', '1', 'system', NULL, '2026-01-26 22:41:16', '2026-01-26 22:41:16'),
+('34', 'ai_ip_hourly_limit', '5', 'ai_limits', 'Hourly request limit for public/IP-based users', '2026-01-26 22:41:17', '2026-01-26 22:41:17'),
+('35', 'ai_ip_daily_limit', '20', 'ai_limits', 'Daily request limit for public/IP-based users', '2026-01-26 22:41:17', '2026-01-26 22:41:17'),
+('36', 'ai_user_hourly_limit', '10', 'ai_limits', 'Hourly request limit for authenticated users', '2026-01-26 22:41:17', '2026-01-26 22:41:17'),
+('37', 'ai_user_daily_limit', '50', 'ai_limits', 'Daily request limit for authenticated users', '2026-01-26 22:41:17', '2026-01-26 22:41:17'),
+('38', 'ai_monthly_budget_usd', '100', 'ai_limits', 'Monthly API budget in USD', '2026-01-26 22:41:17', '2026-01-26 22:41:17'),
+('39', 'ai_enable_caching', '1', 'ai_features', 'Enable response caching', '2026-01-26 22:41:17', '2026-01-26 22:41:17'),
+('40', 'ai_cache_ttl_hours', '24', 'ai_features', 'Cache time-to-live in hours', '2026-01-26 22:41:17', '2026-01-26 22:41:17'),
+('41', 'ai_enable_public_access', '1', 'ai_features', 'Allow public access to AI tools', '2026-01-26 22:41:17', '2026-01-26 22:41:17'),
+('42', 'ai_public_tools', 'system_designer', 'ai_features', 'Comma-separated list of public tools', '2026-01-26 22:41:17', '2026-01-26 22:41:17'),
+('43', 'ai_log_retention_days', '90', 'ai_features', 'Days to retain usage logs', '2026-01-26 22:41:17', '2026-01-26 22:41:17'),
+('44', 'ai_emergency_disable', '0', 'ai_features', 'Emergency disable all AI features', '2026-01-26 22:41:17', '2026-01-26 22:41:17'),
+('56', 'smtp_host', '', 'system', NULL, '2026-01-26 22:41:18', '2026-01-26 22:41:18'),
+('57', 'smtp_port', '', 'system', NULL, '2026-01-26 22:41:18', '2026-01-26 22:41:18'),
+('58', 'smtp_username', '', 'system', NULL, '2026-01-26 22:41:18', '2026-01-26 22:41:18'),
+('59', 'smtp_password', '', 'system', NULL, '2026-01-26 22:41:18', '2026-01-26 22:41:18'),
+('60', 'smtp_encryption', 'tls', 'system', NULL, '2026-01-26 22:41:18', '2026-01-26 22:41:18'),
+('101', 'bank1_name', '', 'system', NULL, '2026-01-27 10:33:34', '2026-01-27 10:33:34'),
+('102', 'bank1_account', '', 'system', NULL, '2026-01-27 10:33:34', '2026-01-27 10:33:34'),
+('103', 'bank2_name', '', 'system', NULL, '2026-01-27 10:33:34', '2026-01-27 10:33:34'),
+('104', 'bank2_account', '', 'system', NULL, '2026-01-27 10:33:34', '2026-01-27 10:33:34'),
+('105', 'bank_account_name', '', 'system', NULL, '2026-01-27 10:33:34', '2026-01-27 10:33:34'),
+('112', 'tinymce_api_key', 'no-api-key', 'system', NULL, '2026-01-27 10:33:34', '2026-01-27 10:33:34'),
+('113', 'quote_terms', '', 'system', NULL, '2026-01-27 10:33:34', '2026-01-27 10:33:34'),
+('114', 'quote_warranty', '', 'system', NULL, '2026-01-27 10:33:34', '2026-01-27 10:33:34'),
+('115', 'groq_api_key', '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', 'system', NULL, '2026-01-27 10:33:34', '2026-01-27 10:33:34'),
+('116', 'company_logo', 'uploads/logo/company_logo_1770280404.jpg', 'system', NULL, '2026-01-29 08:43:45', '2026-02-05 09:33:24'),
+('117', 'company_favicon', 'uploads/logo/favicon.png', 'system', NULL, '2026-01-29 08:43:45', '2026-01-29 08:43:45'),
+('298', 'hr_work_start_time', '09:00', 'hr', 'Default work start time', '2026-02-02 09:24:48', '2026-02-02 09:24:48'),
+('299', 'hr_work_end_time', '17:00', 'hr', 'Default work end time', '2026-02-02 09:24:48', '2026-02-02 09:24:48'),
+('300', 'hr_currency_symbol', '₦', 'hr', 'Currency for payroll', '2026-02-02 09:24:48', '2026-02-02 09:24:48'),
+('301', 'hr_recruitment_email_template', 'Dear {name},\n\nThank you for applying...', 'hr', 'Default recruitment email', '2026-02-02 09:24:48', '2026-02-02 09:24:48');
 
--- ============================================
--- HELPER FUNCTIONS
--- ============================================
+-- Seed data for `hr_settings`
+INSERT INTO `hr_settings` (`id`, `setting_key`, `setting_value`, `updated_at`) VALUES 
+('1', 'id_card_primary_color', '#0072bc', '2026-02-02 22:08:30'),
+('2', 'id_card_secondary_color', '#39b54a', '2026-02-02 22:08:30'),
+('3', 'id_card_tertiary_color', '#005a9c', '2026-02-02 22:08:30'),
+('4', 'id_card_logo_type', 'system', '2026-02-02 22:08:30'),
+('5', 'id_card_show_qr', '1', '2026-02-02 22:08:30'),
+('9', 'id_card_subtitle_text', '{{company_website}}', '2026-02-03 23:54:58'),
+('10', 'id_card_emergency_label', 'IF FOUND OR IN CASE OF AN EMERGENCY PLEASE RETURN TO THE ADDRESS OR CONTACT THE PHONE NUMBER NUMBER BELOW', '2026-02-03 23:54:58'),
+('11', 'id_card_disclaimer_text', '', '2026-02-03 23:54:58'),
+('12', 'id_card_logo_align', 'center', '2026-02-03 04:53:38'),
+('13', 'id_card_header_align', 'center', '2026-02-03 04:53:38'),
+('14', 'id_card_photo_shape', 'circle', '2026-02-03 04:53:38'),
+('15', 'id_card_show_name', '0', '2026-02-03 01:59:58'),
+('26', 'id_card_custom_css', '/* Card Dimensions & Base */\r\n.id-card {\r\n    width: var(--card-width);\r\n    height: var(--card-height);\r\n    background: white;\r\n    border-radius: var(--card-radius);\r\n    box-shadow: 0 10px 20px rgba(0,0,0,0.15);\r\n    position: relative;\r\n    overflow: hidden;\r\n    display: flex;\r\n    flex-direction: column;\r\n    border: 1px solid #e0e0e0;\r\n    font-family: \'Roboto\', sans-serif;\r\n}\r\n\r\n/* Header & Logo */\r\n.header { \r\n    text-align: center; \r\n    padding-top: 15px; margin-bottom: 2px; padding-left: 20px; padding-right: 20px;\r\n}\r\n.logo-graphic { \r\n    display: flex; \r\n    justify-content: center; \r\n    align-items: center; \r\n    gap: 5px; \r\n    margin-bottom: 5px; \r\n}\r\n.brand-name { font-size: 28px; font-weight: 700; color: #222; letter-spacing: -1px; line-height: 1; margin-top: 5px; }\r\n.brand-subtitle { font-size: 10px; letter-spacing: 4px; color: #444; font-weight: 500; margin-top: 2px; text-transform: uppercase; }\r\n\r\n/* Photo */\r\n.photo-container { display: flex; justify-content: center; margin-bottom: 15px; position: relative; }\r\n.photo-frame { \r\n    width: 170px; height: 170px; \r\n    border-radius: 50%;\r\n    border: 4px solid var(--brand-blue); \r\n    overflow: hidden; \r\n    background-color: #eee; \r\n    z-index: 10; \r\n}\r\n.photo-frame img { width: 100%; height: 100%; object-fit: cover; }\r\n\r\n/* Person Info */\r\n.person-info { text-align: center; margin-bottom: 2px; z-index: 10; }\r\n.person-name { font-size: 32px; font-weight: 900; color: #222; text-transform: uppercase; margin-bottom: px; }\r\n.person-role { font-size: 16px; color: var(--brand-blue); font-weight: 900; }\r\n\r\n/* Contact List */\r\n.contact-list { padding: 0 20px; z-index: 10; }\r\n.contact-item { display: flex; align-items: center; margin-bottom: 12px; background: rgba(255, 255, 255, 0.9); padding: 5px 10px; border-radius: 50px; }\r\n.icon-box { width: 30px; height: 30px; border-radius: 50%; display: flex; justify-content: center; align-items: center; color: white; margin-right: 12px; flex-shrink: 0; font-size: 14px; }\r\n.icon-green { background-color: var(--brand-green); }\r\n.icon-blue { background-color: var(--brand-blue); }\r\n.contact-text { font-size: 14px; color: #333; font-weight: 600; }\r\n\r\n/* Footer Waves */\r\n.wave-footer { position: absolute; bottom: 0; left: 0; width: 100%; height: 180px; z-index: 1; overflow: hidden; }\r\n\r\n/* Back Side */\r\n.back-header { text-align: center; margin-top: 15px; padding: 0 20px; }\r\n.back-title { color: var(--brand-blue); font-weight: 700; font-size: 16px; line-height: 1.3; margin-bottom: 20px; }\r\n.emergency-label { font-size: 15px; color: #333; text-transform: uppercase; margin-bottom: 10px; font-weight: 700; }\r\n.back-contact-list { padding: 0 30px; }\r\n.back-contact-item { display: flex; align-items: flex-start; margin-bottom: 15px; }\r\n.back-contact-text { font-size: 13px; color: #333; font-weight: 900; margin-top: 5px; line-height: 1.4; }\r\n.id-section { text-align: center; font-weight: bold; margin-bottom: 5px; font-size: 14px; color: #333; }\r\n.qr-section { display: flex; justify-content: center; align-items: center; margin-bottom: 10px; position: relative; z-index: 10; width: 100%; }\r\n.qr-code { width: 70px; height: 70px; background: white; padding: 5px; border-radius: 5px; }\r\n.disclaimer { text-align: center; font-size: 10px; color: white; padding: 0 30px; position: relative; z-index: 10; margin-bottom: 25px; line-height: 1.3; }\r\n.footer-contacts { display: flex; flex-direction: column; gap: 2px; padding: 10px 20px; background: transparent; position: absolute; bottom: 0; width: 100%; z-index: 10; }\r\n.footer-row { display: flex; justify-content: space-between; font-weight: 600; font-size: 25px; color: #fff; }\r\n.footer-item { display: flex; align-items: center; gap: 19px; }\r\n.footer-icon { color: var(--brand-green); }\r\n.footer-icon.blue { color: var(--brand-blue); }\r\n', '2026-02-04 01:14:41'),
+('34', 'id_card_front_html', '<div class=\"header\">\r\n    <div class=\"logo-graphic\">\r\n        {{company_logo}}\r\n    </div>\r\n    <div class=\"person-role\"\">{{company_website}}</div>\r\n</div>\r\n\r\n<div class=\"photo-container\">\r\n    <div class=\"photo-frame\">\r\n        <img src=\"{{photo_url}}\" alt=\"Photo\">\r\n    </div>\r\n</div>\r\n\r\n<div class=\"person-info\">\r\n    <div class=\"person-name\">{{full_name}}</div>\r\n    <div class=\"person-role\">{{designation}}</div>\r\n</div>\r\n\r\n\r\n<div class=\"wave-footer\">\r\n    <svg class=\"wave-graphic\" viewBox=\"0 0 350 180\" preserveAspectRatio=\"none\">\r\n        <path class=\"fill-green\" d=\"M0,80 C100,60 200,120 350,60 L350,180 L0,180 Z\" fill=\"{{color_secondary}}\" opacity=\"0.9\" />\r\n        <path class=\"fill-blue\" d=\"M0,100 C120,80 250,150 350,100 L350,180 L0,180 Z\" fill=\"{{color_primary}}\" opacity=\"0.85\" />\r\n        <path class=\"fill-dark\" d=\"M0,130 C80,110 180,160 350,120 L350,180 L0,180 Z\" fill=\"{{color_tertiary}}\" opacity=\"0.6\" />\r\n    </svg>\r\n</div>\r\n', '2026-02-04 01:08:53'),
+('35', 'id_card_back_html', '<div class=\"back-header\">\r\n   <div class=\"logo-graphic\">\r\n        {{company_logo}}\r\n    </div>\r\n    <div class=\"person-role\">{{employee_code}}</div>\r\n    <div class=\"emergency-label\">{{emergency_label}}</div>\r\n</div>\r\n\r\n<div class=\"back-contact-list\">\r\n    \r\n    <div class=\"back-contact-item\">\r\n        <div class=\"back-contact-text\">{{company_address}}</div>\r\n    </div>\r\n<div class=\"back-contact-item\">\r\n        <div class=\"back-contact-text\">{{company_phone}}</div>\r\n    </div>\r\n</div>\r\n\r\n<div class=\"qr-section\" style=\"display: flex; justify-content: center; align-items: flex-end; gap: 15px;\">\r\n    <div>{{qr_code}}</div>\r\n    <div style=\"text-align: center; margin-bottom: 5px;\">\r\n        {{signature}}\r\n        <div style=\"font-size: 7px; color: #888; text-transform: uppercase; margin-top: 2px;\">Authorized Sig</div>\r\n    </div>\r\n</div>\r\n<div class=\"back-card-wave-bg\">\r\n    <svg class=\"wave-graphic\" viewBox=\"0 65 350 180\" preserveAspectRatio=\"none\">\r\n        <path class=\"fill-green\" d=\"M0,80 C100,60 200,120 350,60 L350,180 L0,180 Z\" fill=\"{{color_secondary}}\" opacity=\"0.9\" />\r\n        <path class=\"fill-blue\" d=\"M0,100 C120,80 250,150 350,100 L350,180 L0,180 Z\" fill=\"{{color_primary}}\" opacity=\"0.85\" />\r\n        <path class=\"fill-dark\" d=\"M0,130 C80,110 180,160 350,120 L350,180 L0,180 Z\" fill=\"{{color_tertiary}}\" opacity=\"0.6\" />\r\n    </svg>\r\n</div>\r\n\r\n<div class=\"footer-contacts\">\r\n    <div class=\"footer-row\">\r\n        <div class=\"footer-item\"><i class=\"fa-solid fa-phone footer-icon\"></i> {{company_website}}</div>\r\n\r\n    </div>\r\n</div>\r\n', '2026-02-04 00:29:38');
 
-DELIMITER $$
+-- Seed data for `readymade_quote_categories`
+INSERT INTO `readymade_quote_categories` (`id`, `category_name`, `description`, `is_active`, `created_at`, `updated_at`) VALUES 
+('1', 'General', 'Default Category', '1', '2026-01-26 22:41:16', '2026-01-26 22:41:16');
 
-CREATE FUNCTION IF NOT EXISTS get_market_data(
-    p_data_type VARCHAR(50) CHARSET utf8mb4 COLLATE utf8mb4_unicode_ci,
-    p_data_key VARCHAR(100) CHARSET utf8mb4 COLLATE utf8mb4_unicode_ci
-) RETURNS DECIMAL(15,2)
-DETERMINISTIC
-BEGIN
-    DECLARE v_value DECIMAL(15,2);
-    
-    SELECT data_value INTO v_value
-    FROM market_data
-    WHERE data_type = p_data_type COLLATE utf8mb4_unicode_ci
-    AND data_key = p_data_key COLLATE utf8mb4_unicode_ci
-    AND effective_date <= CURDATE()
-    ORDER BY effective_date DESC
-    LIMIT 1;
-    
-    RETURN COALESCE(v_value, 0);
-END$$
+-- Seed data for `readymade_quote_templates`
+-- Seed data for `readymade_quote_template_items`
+-- Seed data for `market_data`
+INSERT INTO `market_data` (`id`, `data_type`, `data_key`, `data_value`, `effective_date`, `notes`, `created_at`, `updated_at`) VALUES 
+('1', 'fuel_price', 'petrol_per_litre', '650.00', '2026-01-01', 'Average petrol price in Nigeria', '2026-01-27 11:54:44', '2026-01-27 11:54:44'),
+('2', 'fuel_price', 'diesel_per_litre', '850.00', '2026-01-01', 'Average diesel price in Nigeria', '2026-01-27 11:54:44', '2026-01-27 11:54:44'),
+('3', 'electricity', 'nepa_per_kwh_residential', '68.00', '2026-01-01', 'NEPA residential tariff (average)', '2026-01-27 11:54:44', '2026-01-27 11:54:44'),
+('4', 'electricity', 'nepa_per_kwh_commercial', '85.00', '2026-01-01', 'NEPA commercial tariff (average)', '2026-01-27 11:54:44', '2026-01-27 11:54:44'),
+('5', 'generator', 'running_cost_per_hour_2.5kva', '300.00', '2026-01-01', 'Small generator fuel cost', '2026-01-27 11:54:44', '2026-01-27 11:54:44'),
+('6', 'generator', 'running_cost_per_hour_5kva', '500.00', '2026-01-01', 'Medium generator fuel cost', '2026-01-27 11:54:44', '2026-01-27 11:54:44'),
+('7', 'generator', 'running_cost_per_hour_10kva', '900.00', '2026-01-01', 'Large generator fuel cost', '2026-01-27 11:54:44', '2026-01-27 11:54:44'),
+('8', 'generator', 'maintenance_per_month_2.5kva', '8000.00', '2026-01-01', 'Oil, servicing, repairs', '2026-01-27 11:54:44', '2026-01-27 11:54:44'),
+('9', 'generator', 'maintenance_per_month_5kva', '15000.00', '2026-01-01', 'Oil, servicing, repairs', '2026-01-27 11:54:44', '2026-01-27 11:54:44'),
+('10', 'generator', 'maintenance_per_month_10kva', '25000.00', '2026-01-01', 'Oil, servicing, repairs', '2026-01-27 11:54:44', '2026-01-27 11:54:44'),
+('11', 'solar', 'avg_sun_hours_per_day', '5.50', '2026-01-01', 'Average sun hours in Nigeria', '2026-01-27 11:54:44', '2026-01-27 11:54:44'),
+('12', 'solar', 'performance_degradation_annual', '0.50', '2026-01-01', 'Annual panel efficiency loss %', '2026-01-27 11:54:44', '2026-01-27 11:54:44'),
+('13', 'inflation', 'annual_rate', '24.00', '2026-01-01', 'Nigeria inflation rate', '2026-01-27 11:54:44', '2026-01-27 11:54:44'),
+('14', 'currency', 'usd_to_ngn', '1600.00', '2026-01-01', 'Exchange rate USD to Naira', '2026-01-27 11:54:44', '2026-01-27 11:54:44');
 
-DELIMITER ;
+SET FOREIGN_KEY_CHECKS=1;
