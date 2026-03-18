@@ -404,6 +404,34 @@ CREATE TABLE `invoice_line_items` (
   CONSTRAINT `invoice_line_items_ibfk_2` FOREIGN KEY (`product_id`) REFERENCES `products` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Table structure for `item_categories`
+DROP TABLE IF EXISTS `item_categories`;
+CREATE TABLE `item_categories` (
+    `id` INT AUTO_INCREMENT PRIMARY KEY,
+    `name` VARCHAR(255) NOT NULL,
+    `description` TEXT,
+    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Table structure for `items`
+DROP TABLE IF EXISTS `items`;
+CREATE TABLE `items` (
+    `id` INT AUTO_INCREMENT PRIMARY KEY,
+    `name` VARCHAR(255) NOT NULL,
+    `sku` VARCHAR(100),
+    `category_id` INT,
+    `description` TEXT,
+    `unit` VARCHAR(50),
+    `price` DECIMAL(15,2) DEFAULT '0.00',
+    `cost_price` DECIMAL(15,2) DEFAULT '0.00',
+    `stock_quantity` INT DEFAULT 0,
+    `minimum_stock` INT DEFAULT 0,
+    `status` ENUM('active', 'archived') DEFAULT 'active',
+    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (`category_id`) REFERENCES `item_categories`(`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- Table structure for `invoices`
 DROP TABLE IF EXISTS `invoices`;
 CREATE TABLE `invoices` (
@@ -526,6 +554,8 @@ CREATE TABLE `quote_line_items` (
   `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
   `quote_id` int(10) unsigned NOT NULL,
   `product_id` int(10) unsigned DEFAULT NULL,
+  `item_id` INT NULL,
+  `item_name` VARCHAR(255) NULL,
   `item_number` int(11) NOT NULL,
   `quantity` decimal(10,2) NOT NULL,
   `description` text NOT NULL,
@@ -764,7 +794,7 @@ INSERT INTO `settings` (`id`, `setting_key`, `setting_value`, `category`, `descr
 ('112', 'tinymce_api_key', 'no-api-key', 'system', NULL, '2026-01-27 10:33:34', '2026-01-27 10:33:34'),
 ('113', 'quote_terms', '', 'system', NULL, '2026-01-27 10:33:34', '2026-01-27 10:33:34'),
 ('114', 'quote_warranty', '', 'system', NULL, '2026-01-27 10:33:34', '2026-01-27 10:33:34'),
-('115', 'groq_api_key', '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', 'system', NULL, '2026-01-27 10:33:34', '2026-01-27 10:33:34'),
+('115', 'groq_api_key', 'no-api-key', 'system', NULL, '2026-01-27 10:33:34', '2026-01-27 10:33:34'),
 ('116', 'company_logo', 'uploads/logo/company_logo_1770280404.jpg', 'system', NULL, '2026-01-29 08:43:45', '2026-02-05 09:33:24'),
 ('117', 'company_favicon', 'uploads/logo/favicon.png', 'system', NULL, '2026-01-29 08:43:45', '2026-01-29 08:43:45'),
 ('298', 'hr_work_start_time', '09:00', 'hr', 'Default work start time', '2026-02-02 09:24:48', '2026-02-02 09:24:48'),

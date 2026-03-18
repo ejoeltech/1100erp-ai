@@ -41,6 +41,7 @@ define('COMPANY_ADDRESS', getSetting('company_address', ''));
 define('COMPANY_PHONE', getSetting('company_phone', ''));
 define('COMPANY_EMAIL', getSetting('company_email', ''));
 define('COMPANY_WEBSITE', getSetting('company_website', ''));
+define('COMPANY_LOGO', getSetting('company_logo', ''));
 define('VAT_RATE', (float)getSetting('vat_rate', 7.5));
 define('CURRENCY_SYMBOL', getSetting('currency_symbol', '₦'));
 
