@@ -38,6 +38,23 @@ function getSetting($key, $default = '') {
     }
 }
 
+// Helper function to save/update a setting
+function setSetting($key, $value) {
+    global $pdo;
+    try {
+        $stmt = $pdo->prepare("
+            INSERT INTO settings (setting_key, setting_value)
+            VALUES (?, ?)
+            ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value), updated_at = NOW()
+        ");
+        $stmt->execute([$key, $value]);
+        return true;
+    } catch (PDOException $e) {
+        error_log("setSetting error for key '$key': " . $e->getMessage());
+        return false;
+    }
+}
+
 // Load basic settings into constants
 define('COMPANY_NAME', getSetting('company_name', 'Your Company Name'));
 define('COMPANY_ADDRESS', getSetting('company_address', ''));
@@ -52,7 +69,8 @@ define('CURRENCY_SYMBOL', getSetting('currency_symbol', '₦'));
 define('THEME_COLOR', getSetting('theme_color', '#0076BE'));
 define('FOOTER_TEXT', getSetting('footer_text', 'We appreciate your business! Thank you'));
 define('PDF_QUALITY', getSetting('pdf_quality', 'high'));
-define('DEFAULT_PAYMENT_TERMS', getSetting('payment_terms', 'Due on Receipt'));
+define('DEFAULT_PAYMENT_TERMS', getSetting('default_payment_terms', 'Due on Receipt'));
+define('TINYMCE_API_KEY', getSetting('tinymce_api_key', 'no-api-key'));
 
 // Bank account helper functions
 function getBankAccountsForDisplay() {
